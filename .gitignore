@@ -1,0 +1,6 @@
+# Local secrets and artifacts
+*.pem
+*.key
+cookies.txt
+*.cookies
+temp/
