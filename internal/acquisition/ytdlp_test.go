@@ -49,6 +49,29 @@ func TestSearchTarget(t *testing.T) {
 	}
 }
 
+func TestRuntimePath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		spec string
+		want string
+	}{
+		{name: "bare path", spec: "/usr/bin/deno", want: "/usr/bin/deno"},
+		{name: "named path", spec: "node:/usr/bin/node", want: "/usr/bin/node"},
+		{name: "named deno", spec: "deno:/opt/deno", want: "/opt/deno"},
+		{name: "spaces", spec: " node:/usr/bin/node ", want: "/usr/bin/node"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := runtimePath(tc.spec); got != tc.want {
+				t.Fatalf("runtimePath(%q) = %q, want %q", tc.spec, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestYtDlpHealthChecksCookieFile(t *testing.T) {
 	t.Parallel()
 

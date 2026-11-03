@@ -27,6 +27,16 @@ type YtDlp struct {
 
 func (y *YtDlp) Name() string { return "yt-dlp" }
 
+// runtimePath strips an optional name: prefix from a JS runtime spec so the
+// health check stats the executable rather than the whole spec.
+func runtimePath(spec string) string {
+	spec = strings.TrimSpace(spec)
+	if index := strings.IndexByte(spec, ':'); index > 0 {
+		return spec[index+1:]
+	}
+	return spec
+}
+
 // searchTarget turns MusicBrainz metadata into a yt-dlp search. An explicit
 // search prefix or URL is passed through unchanged so a caller keeps control.
 func searchTarget(query string) string {
@@ -58,7 +68,7 @@ func (y *YtDlp) Health(ctx context.Context) (Health, error) {
 		return Health{Available: false, Reason: err.Error()}, nil
 	}
 	if strings.TrimSpace(y.Runtime) != "" {
-		if _, err := os.Stat(y.Runtime); err != nil {
+		if _, err := os.Stat(runtimePath(y.Runtime)); err != nil {
 			return Health{Available: false, Reason: "js runtime unavailable: " + err.Error()}, nil
 		}
 	}
