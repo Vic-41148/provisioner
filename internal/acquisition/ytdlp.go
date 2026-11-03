@@ -27,6 +27,17 @@ type YtDlp struct {
 
 func (y *YtDlp) Name() string { return "yt-dlp" }
 
+// searchTarget turns MusicBrainz metadata into a yt-dlp search. An explicit
+// search prefix or URL is passed through unchanged so a caller keeps control.
+func searchTarget(query string) string {
+	query = strings.TrimSpace(query)
+	lower := strings.ToLower(query)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "ytsearch") {
+		return query
+	}
+	return "ytsearch1:" + query
+}
+
 func (y *YtDlp) binary() (string, error) {
 	if strings.TrimSpace(y.Binary) != "" {
 		if _, err := os.Stat(y.Binary); err != nil {
@@ -82,6 +93,7 @@ func (y *YtDlp) Acquire(ctx context.Context, request Request) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("yt-dlp: create work dir: %w", err)
 	}
+	defer os.RemoveAll(dir)
 
 	args := []string{
 		"--no-playlist",
@@ -89,13 +101,18 @@ func (y *YtDlp) Acquire(ctx context.Context, request Request) (string, error) {
 		"--audio-format", "opus",
 		"--output", filepath.Join(dir, "%(title)s.%(ext)s"),
 	}
-	if strings.TrimSpace(y.Runtime) != "" {
-		args = append(args, "--js-runtimes", "deno:"+y.Runtime)
+	if runtime := strings.TrimSpace(y.Runtime); runtime != "" {
+		// A bare path selects Deno, matching the documented default; an
+		// explicit name:path lets a host use another supported runtime.
+		if !strings.Contains(runtime, ":") {
+			runtime = "deno:" + runtime
+		}
+		args = append(args, "--js-runtimes", runtime)
 	}
 	if strings.TrimSpace(y.Cookies) != "" {
 		args = append(args, "--cookies", y.Cookies)
 	}
-	args = append(args, request.Query)
+	args = append(args, searchTarget(request.Query))
 
 	cmd := exec.CommandContext(ctx, bin, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -107,10 +124,23 @@ func (y *YtDlp) Acquire(ctx context.Context, request Request) (string, error) {
 		return "", fmt.Errorf("yt-dlp: read work dir: %w", err)
 	}
 	for _, entry := range entries {
-		if entry.IsDir() {
+		if entry.IsDir() || strings.HasSuffix(entry.Name(), ".part") {
 			continue
 		}
-		return filepath.Join(dir, entry.Name()), nil
+		final, err := os.CreateTemp("", "provisioner-*"+filepath.Ext(entry.Name()))
+		if err != nil {
+			return "", fmt.Errorf("yt-dlp: create output: %w", err)
+		}
+		finalPath := final.Name()
+		if err := final.Close(); err != nil {
+			os.Remove(finalPath)
+			return "", fmt.Errorf("yt-dlp: close output: %w", err)
+		}
+		if err := os.Rename(filepath.Join(dir, entry.Name()), finalPath); err != nil {
+			os.Remove(finalPath)
+			return "", fmt.Errorf("yt-dlp: move output: %w", err)
+		}
+		return finalPath, nil
 	}
 	return "", fmt.Errorf("yt-dlp: no output file produced")
 }

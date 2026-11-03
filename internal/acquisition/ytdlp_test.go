@@ -25,6 +25,30 @@ func TestYtDlpHealthUnavailableWithoutBinary(t *testing.T) {
 	}
 }
 
+func TestSearchTarget(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{name: "metadata", query: "Artist Song", want: "ytsearch1:Artist Song"},
+		{name: "explicit search", query: "ytsearch5:Artist Song", want: "ytsearch5:Artist Song"},
+		{name: "https url", query: "https://example.com/audio", want: "https://example.com/audio"},
+		{name: "http url", query: "http://example.com/audio", want: "http://example.com/audio"},
+		{name: "trims spaces", query: "  Artist Song  ", want: "ytsearch1:Artist Song"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := searchTarget(tc.query); got != tc.want {
+				t.Fatalf("searchTarget(%q) = %q, want %q", tc.query, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestYtDlpHealthChecksCookieFile(t *testing.T) {
 	t.Parallel()
 

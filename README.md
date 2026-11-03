@@ -26,3 +26,21 @@ content.
 Startup checks verify the runtime, token provider and cookie file. On failure
 the plugin reports "YouTube downloads unavailable" and GrooveSync core is
 unaffected.
+
+## Running
+
+The runner drains queued acquisition requests over syncd's HTTP interface and
+uploads each download as a cached rendition. It never opens syncd's database.
+
+    provisioner -server http://127.0.0.1:8080 -once
+
+The admin token comes from `~/.syncd-token` by default, or from `-token-file`,
+`SYNCD_TOKEN`, or `-token`. A platform-supplied JS runtime can be selected with
+`-js-runtime node:/path/to/node`; a bare path keeps the Deno default. Use
+`-interval`, `-between`, `-timeout`, `-yt-dlp`, `-cookies` and `-po-provider` to
+tune a long-running worker. Without `-once` the runner polls until interrupted.
+
+For each request the runner claims it, calls yt-dlp, uploads the file to
+`/sync/v1/library/uploads/{hash}?kind=cached`, and marks the request done. A
+download or upload error is recorded with `last_error` and the request goes back
+to the queue until its attempt budget is spent.
