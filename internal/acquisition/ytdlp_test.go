@@ -6,6 +6,8 @@ package acquisition
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -86,4 +88,25 @@ func TestYtDlpHealthChecksCookieFile(t *testing.T) {
 	}
 	// reason should mention cookie file; binary check comes first though.
 	_ = os.Args
+}
+
+func TestYtDlpHealthRequiresFfmpeg(t *testing.T) {
+	dir := t.TempDir()
+	fake := filepath.Join(dir, "yt-dlp")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\necho fake-version\n"), 0o755); err != nil {
+		t.Fatalf("write fake yt-dlp: %v", err)
+	}
+	t.Setenv("PATH", dir)
+
+	p := &YtDlp{Binary: fake}
+	health, err := p.Health(context.Background())
+	if err != nil {
+		t.Fatalf("Health() error = %v", err)
+	}
+	if health.Available {
+		t.Fatal("Health().Available = true, want false without ffmpeg")
+	}
+	if !strings.Contains(health.Reason, "ffmpeg") {
+		t.Fatalf("Health().Reason = %q, want ffmpeg", health.Reason)
+	}
 }

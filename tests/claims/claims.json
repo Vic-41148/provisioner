@@ -14,7 +14,8 @@
       "claim": "The health check requires ffmpeg on PATH.",
       "evidence": [
         "contains:internal/acquisition/ytdlp.go::exec.LookPath(\"ffmpeg\")",
-        "contains:README.md::ffmpeg"
+        "contains:README.md::ffmpeg",
+        "contains:internal/acquisition/ytdlp_test.go::TestYtDlpHealthRequiresFfmpeg"
       ]
     },
     {
