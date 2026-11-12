@@ -27,6 +27,14 @@ Startup checks verify the runtime, `ffmpeg` and cookie file. On failure the
 plugin reports "YouTube downloads unavailable" and GrooveSync core is
 unaffected.
 
+## Home connection only
+
+Before the first request the runner asks `https://ipinfo.io/json` for the public
+address and ASN organisation and refuses to start when it names a known cloud or
+hosting provider. A failed lookup is also fatal, because an unknown egress
+cannot be shown to be a home connection. `-egress-url` points the check at a
+self-hosted endpoint with the same `ip` and `org` fields.
+
 ## Running
 
 The runner drains queued acquisition requests over syncd's HTTP interface and

@@ -32,6 +32,7 @@ type config struct {
 	Binary         string
 	JSRuntime      string
 	Cookies        string
+	EgressURL      string
 	MatchThreshold float64
 	SearchLimit    int
 }
@@ -48,6 +49,7 @@ func main() {
 	flag.StringVar(&cfg.Binary, "yt-dlp", "", "path to the yt-dlp executable; empty resolves via PATH")
 	flag.StringVar(&cfg.JSRuntime, "js-runtime", "", "JS runtime as name:path or a Deno path; empty lets yt-dlp choose")
 	flag.StringVar(&cfg.Cookies, "cookies", "", "optional cookie file")
+	flag.StringVar(&cfg.EgressURL, "egress-url", "https://ipinfo.io/json", "public-address lookup used to refuse datacenter egress")
 	flag.Float64Var(&cfg.MatchThreshold, "match-threshold", 0.5, "minimum confidence for a silent download")
 	flag.IntVar(&cfg.SearchLimit, "search-limit", 5, "candidates to inspect before downloading")
 	flag.Parse()
@@ -74,6 +76,10 @@ func main() {
 	}
 	if !health.Available {
 		log.Fatalf("provider unavailable: %s", health.Reason)
+	}
+
+	if err := acquisition.CheckEgress(ctx, acquisition.IPInfoLookup{URL: cfg.EgressURL}); err != nil {
+		log.Fatalf("egress check: %v", err)
 	}
 
 	client := acquisition.NewClient(cfg.Server, token)

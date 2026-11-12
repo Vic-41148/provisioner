@@ -70,6 +70,15 @@
       ]
     },
     {
+      "id": "refuse-datacenter-egress",
+      "claim": "The provisioner refuses to start on a known datacenter egress.",
+      "evidence": [
+        "contains:internal/acquisition/egress.go::IsDatacenter",
+        "contains:internal/acquisition/egress_test.go::TestIsDatacenter",
+        "contains:cmd/provisioner/main.go::CheckEgress"
+      ]
+    },
+    {
       "id": "runner-uses-provider",
       "claim": "The runner drains the queue through a provider.",
       "evidence": [
