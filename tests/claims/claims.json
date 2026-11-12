@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "claims": [
+    {
+      "id": "external-ytdlp",
+      "claim": "Downloads shell out to the external yt-dlp executable.",
+      "evidence": [
+        "contains:internal/acquisition/ytdlp.go::exec.CommandContext",
+        "contains:internal/acquisition/ytdlp.go::--extract-audio"
+      ]
+    },
+    {
+      "id": "ffmpeg-checked",
+      "claim": "The health check requires ffmpeg on PATH.",
+      "evidence": [
+        "contains:internal/acquisition/ytdlp.go::exec.LookPath(\"ffmpeg\")",
+        "contains:README.md::ffmpeg"
+      ]
+    },
+    {
+      "id": "no-dead-matching",
+      "claim": "The unused matching helper is gone.",
+      "evidence": [
+        "absent:internal/acquisition/match.go"
+      ]
+    },
+    {
+      "id": "no-po-provider",
+      "claim": "The unused PO-token provider is gone from code and docs.",
+      "evidence": [
+        "lacks:internal/acquisition/ytdlp.go::POProvider",
+        "lacks:README.md::po-provider"
+      ]
+    },
+    {
+      "id": "runner-uses-provider",
+      "claim": "The runner drains the queue through a provider.",
+      "evidence": [
+        "contains:internal/acquisition/runner.go::Provider.Acquire"
+      ]
+    }
+  ]
+}
