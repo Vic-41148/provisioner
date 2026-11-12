@@ -18,6 +18,14 @@
       ]
     },
     {
+      "id": "kill-switch-stops-runner",
+      "claim": "The runner stops when a claim is refused by the core kill switch.",
+      "evidence": [
+        "contains:internal/acquisition/runner.go::ErrStopped",
+        "contains:internal/acquisition/client.go::ErrStopped"
+      ]
+    },
+    {
       "id": "no-dead-matching",
       "claim": "The unused matching helper is gone.",
       "evidence": [
