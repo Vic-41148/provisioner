@@ -34,6 +34,7 @@ type fakeCore struct {
 	completed []string
 	failed    []string
 	uploads   map[string]string
+	reviews   []map[string]string
 	disabled  bool
 }
 
@@ -66,9 +67,27 @@ func (c *fakeCore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c.handleAction(w, r)
 	case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/sync/v1/library/uploads/"):
 		c.handleUpload(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/sync/v1/review":
+		c.handleReview(w, r)
 	default:
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	}
+}
+
+func (c *fakeCore) handleReview(w http.ResponseWriter, r *http.Request) {
+	var payload map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "decode body"})
+		return
+	}
+	for _, key := range []string{"provider", "service_id", "reason"} {
+		if strings.TrimSpace(payload[key]) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": key + " required"})
+			return
+		}
+	}
+	c.reviews = append(c.reviews, payload)
+	writeJSON(w, http.StatusCreated, map[string]string{"id": "review-1"})
 }
 
 func (c *fakeCore) handleAction(w http.ResponseWriter, r *http.Request) {
@@ -168,7 +187,7 @@ func (p *fakeProvider) Health(context.Context) (acquisition.Health, error) {
 	return acquisition.Health{Available: true}, nil
 }
 
-func newRunner(t *testing.T, core *fakeCore, provider acquisition.Provider, between time.Duration) (acquisition.Runner, *[]time.Duration) {
+func newRunner(t *testing.T, core *fakeCore, provider acquisition.Provider, between time.Duration) (acquisition.Runner, *[]time.Duration, *acquisition.Client) {
 	t.Helper()
 	server := httptest.NewServer(core)
 	t.Cleanup(server.Close)
@@ -183,14 +202,14 @@ func newRunner(t *testing.T, core *fakeCore, provider acquisition.Provider, betw
 		Sleep: func(d time.Duration) {
 			*delays = append(*delays, d)
 		},
-	}, delays
+	}, delays, client
 }
 
 func TestProvisionerDrainsQueueWithFakeYtDlp(t *testing.T) {
 	core := newFakeCore()
 	core.add("req-1", "track-1", "Artist Song")
 	provider := &fakeProvider{dir: t.TempDir(), content: "downloaded audio"}
-	runner, _ := newRunner(t, core, provider, time.Second)
+	runner, _, _ := newRunner(t, core, provider, time.Second)
 
 	if err := runner.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -214,7 +233,7 @@ func TestProvisionerRecordsProviderFailure(t *testing.T) {
 	core := newFakeCore()
 	core.add("req-1", "track-1", "Artist Song")
 	provider := &fakeProvider{dir: t.TempDir(), err: errors.New("download refused")}
-	runner, _ := newRunner(t, core, provider, time.Second)
+	runner, _, _ := newRunner(t, core, provider, time.Second)
 
 	if err := runner.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -239,7 +258,7 @@ func TestProvisionerStopsOnKillSwitch(t *testing.T) {
 	core.add("req-2", "track-2", "Artist Other")
 	core.disabled = true
 	provider := &fakeProvider{dir: t.TempDir(), content: "audio"}
-	runner, _ := newRunner(t, core, provider, time.Second)
+	runner, _, _ := newRunner(t, core, provider, time.Second)
 
 	if err := runner.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -257,7 +276,7 @@ func TestProvisionerSpacesDownloads(t *testing.T) {
 	core.add("req-1", "track-1", "Artist Song")
 	core.add("req-2", "track-2", "Artist Other")
 	provider := &fakeProvider{dir: t.TempDir(), content: "audio"}
-	runner, delays := newRunner(t, core, provider, 250*time.Millisecond)
+	runner, delays, _ := newRunner(t, core, provider, 250*time.Millisecond)
 
 	if err := runner.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -267,5 +286,41 @@ func TestProvisionerSpacesDownloads(t *testing.T) {
 	}
 	if len(core.completed) != 2 {
 		t.Fatalf("completed = %#v, want both jobs", core.completed)
+	}
+}
+
+type fakeSearcher struct {
+	candidates []acquisition.Candidate
+}
+
+func (s *fakeSearcher) Search(context.Context, string, int) ([]acquisition.Candidate, error) {
+	return s.candidates, nil
+}
+
+func TestProvisionerSendsLowConfidenceToReview(t *testing.T) {
+	core := newFakeCore()
+	core.add("req-1", "track-1", "Artist Song")
+	provider := &fakeProvider{dir: t.TempDir(), content: "audio"}
+	runner, _, client := newRunner(t, core, provider, time.Second)
+	runner.Searcher = &fakeSearcher{candidates: []acquisition.Candidate{
+		{ID: "weak", Kind: "audio", Title: "Wrong Song", Confidence: 0.1, URL: "https://example.test/weak"},
+	}}
+	runner.Review = client
+
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+	if len(provider.calls) != 0 {
+		t.Fatalf("provider calls = %d, want none", len(provider.calls))
+	}
+	if len(core.reviews) != 1 {
+		t.Fatalf("reviews = %#v, want one", core.reviews)
+	}
+	review := core.reviews[0]
+	if review["canonical_id"] != "track-1" || review["service_id"] != "weak" || review["provider"] != "yt-dlp" {
+		t.Fatalf("review = %#v, want the low-confidence candidate", review)
+	}
+	if len(core.completed) != 1 {
+		t.Fatalf("completed = %#v, want req-1 after review", core.completed)
 	}
 }

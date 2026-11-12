@@ -5,6 +5,7 @@ package acquisition
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -107,18 +108,13 @@ func (y *YtDlp) Acquire(ctx context.Context, request Request) (string, error) {
 		"--audio-format", "opus",
 		"--output", filepath.Join(dir, "%(title)s.%(ext)s"),
 	}
-	if runtime := strings.TrimSpace(y.Runtime); runtime != "" {
-		// A bare path selects Deno, matching the documented default; an
-		// explicit name:path lets a host use another supported runtime.
-		if !strings.Contains(runtime, ":") {
-			runtime = "deno:" + runtime
-		}
-		args = append(args, "--js-runtimes", runtime)
+	args = y.appendRuntime(args)
+	args = y.appendCookies(args)
+	target := strings.TrimSpace(request.Source)
+	if target == "" {
+		target = searchTarget(request.Query)
 	}
-	if strings.TrimSpace(y.Cookies) != "" {
-		args = append(args, "--cookies", y.Cookies)
-	}
-	args = append(args, searchTarget(request.Query))
+	args = append(args, target)
 
 	cmd := exec.CommandContext(ctx, bin, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -149,4 +145,117 @@ func (y *YtDlp) Acquire(ctx context.Context, request Request) (string, error) {
 		return finalPath, nil
 	}
 	return "", fmt.Errorf("yt-dlp: no output file produced")
+}
+
+// Search lists candidates without downloading. The query keeps the same
+// MusicBrainz metadata shape as Acquire.
+func (y *YtDlp) Search(ctx context.Context, query string, limit int) ([]Candidate, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, fmt.Errorf("yt-dlp: empty query")
+	}
+	bin, err := y.binary()
+	if err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+	args := []string{"--dump-single-json", "--flat-playlist", "--no-playlist"}
+	args = y.appendRuntime(args)
+	args = y.appendCookies(args)
+	if strings.HasPrefix(strings.ToLower(query), "http://") || strings.HasPrefix(strings.ToLower(query), "https://") {
+		args = append(args, query)
+	} else {
+		args = append(args, fmt.Sprintf("ytsearch%d:%s", limit, query))
+	}
+	out, err := exec.CommandContext(ctx, bin, args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("yt-dlp search: %w", err)
+	}
+	return parseSearchJSON(out, query)
+}
+
+func (y *YtDlp) appendRuntime(args []string) []string {
+	if runtime := strings.TrimSpace(y.Runtime); runtime != "" {
+		// A bare path selects Deno, matching the documented default; an
+		// explicit name:path lets a host use another supported runtime.
+		if !strings.Contains(runtime, ":") {
+			runtime = "deno:" + runtime
+		}
+		args = append(args, "--js-runtimes", runtime)
+	}
+	return args
+}
+
+func (y *YtDlp) appendCookies(args []string) []string {
+	if strings.TrimSpace(y.Cookies) != "" {
+		args = append(args, "--cookies", y.Cookies)
+	}
+	return args
+}
+
+type searchEntry struct {
+	ID        string `json:"id"`
+	URL       string `json:"url"`
+	Title     string `json:"title"`
+	Uploader  string `json:"uploader"`
+	Channel   string `json:"channel"`
+	Extractor string `json:"extractor_key"`
+	IEKey     string `json:"ie_key"`
+	Duration  int    `json:"duration"`
+}
+
+func parseSearchJSON(data []byte, query string) ([]Candidate, error) {
+	var payload struct {
+		Entries []searchEntry `json:"entries"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, fmt.Errorf("yt-dlp search: decode: %w", err)
+	}
+	candidates := make([]Candidate, 0, len(payload.Entries))
+	for _, entry := range payload.Entries {
+		if entry.ID == "" && entry.URL == "" {
+			continue
+		}
+		artist := strings.TrimSpace(entry.Uploader)
+		if artist == "" {
+			artist = strings.TrimSpace(entry.Channel)
+		}
+		url := entry.URL
+		if url == "" && entry.ID != "" {
+			url = "https://www.youtube.com/watch?v=" + entry.ID
+		}
+		candidates = append(candidates, Candidate{
+			ID:         entry.ID,
+			Title:      entry.Title,
+			Artist:     artist,
+			Kind:       classifyCandidate(entry.Title, artist),
+			URL:        url,
+			Confidence: Confidence(query, entry.Title, artist),
+		})
+	}
+	return candidates, nil
+}
+
+func classifyCandidate(title, artist string) string {
+	lowerTitle := strings.ToLower(title)
+	lowerArtist := strings.ToLower(artist)
+	for _, marker := range []string{"official music video", "official video", "music video"} {
+		if strings.Contains(lowerTitle, marker) {
+			return "video"
+		}
+	}
+	for _, marker := range []string{"official audio", "lyrics", "lyric video", "audio"} {
+		if strings.Contains(lowerTitle, marker) {
+			return "audio"
+		}
+	}
+	if strings.Contains(lowerArtist, "topic") {
+		return "audio"
+	}
+	if lowerTitle != "" {
+		return "video"
+	}
+	return "upload"
 }

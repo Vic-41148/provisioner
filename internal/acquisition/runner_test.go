@@ -208,3 +208,114 @@ func TestRunnerSpacesDownloads(t *testing.T) {
 		t.Fatalf("slept = %v, want one three second pause", slept)
 	}
 }
+
+type fakeSearcher struct {
+	candidates []Candidate
+	err        error
+	queries    []string
+}
+
+func (s *fakeSearcher) Search(_ context.Context, query string, _ int) ([]Candidate, error) {
+	s.queries = append(s.queries, query)
+	return s.candidates, s.err
+}
+
+type fakeReview struct {
+	candidates []Candidate
+	reasons    []string
+	err        error
+}
+
+func (r *fakeReview) AddReview(_ context.Context, _ Job, candidate Candidate, reason string) error {
+	r.candidates = append(r.candidates, candidate)
+	r.reasons = append(r.reasons, reason)
+	return r.err
+}
+
+func TestRunnerDownloadsBestCandidate(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "song.opus")
+	if err := os.WriteFile(path, []byte("downloaded audio"), 0o644); err != nil {
+		t.Fatalf("write download: %v", err)
+	}
+	queue := &fakeQueue{jobs: []Job{{ID: "req-1", CanonicalID: "track-1", Query: "Artist Song"}}}
+	provider := &fakeProvider{path: path}
+	searcher := &fakeSearcher{candidates: []Candidate{
+		{ID: "video", Kind: "video", Confidence: 0.99, URL: "https://example.test/video"},
+		{ID: "audio", Kind: "audio", Confidence: 0.8, URL: "https://example.test/audio"},
+	}}
+	ingest := &fakeIngest{}
+
+	runner := Runner{
+		Queue: queue, Provider: provider, Ingest: ingest, Searcher: searcher,
+		Between: time.Millisecond, Sleep: func(time.Duration) {},
+	}
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if len(provider.calls) != 1 {
+		t.Fatalf("provider calls = %d, want one", len(provider.calls))
+	}
+	if provider.calls[0].Source != "https://example.test/audio" {
+		t.Fatalf("source = %q, want the audio candidate", provider.calls[0].Source)
+	}
+	if len(queue.completed) != 1 {
+		t.Fatalf("completed = %v, want req-1", queue.completed)
+	}
+}
+
+func TestRunnerSendsLowConfidenceToReview(t *testing.T) {
+	t.Parallel()
+
+	queue := &fakeQueue{jobs: []Job{{ID: "req-1", CanonicalID: "track-1", Query: "Artist Song"}}}
+	provider := &fakeProvider{}
+	searcher := &fakeSearcher{candidates: []Candidate{
+		{ID: "weak", Kind: "audio", Confidence: 0.1, Title: "Wrong Song", URL: "https://example.test/weak"},
+	}}
+	review := &fakeReview{}
+
+	runner := Runner{
+		Queue: queue, Provider: provider, Ingest: &fakeIngest{}, Searcher: searcher, Review: review,
+		Between: time.Millisecond, Sleep: func(time.Duration) {},
+	}
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if len(provider.calls) != 0 {
+		t.Fatalf("provider calls = %d, want none for a low-confidence match", len(provider.calls))
+	}
+	if len(review.candidates) != 1 || review.candidates[0].ID != "weak" {
+		t.Fatalf("review candidates = %#v, want weak", review.candidates)
+	}
+	if len(queue.completed) != 1 {
+		t.Fatalf("completed = %v, want req-1 after review", queue.completed)
+	}
+}
+
+func TestRunnerFailsLowConfidenceWithoutReview(t *testing.T) {
+	t.Parallel()
+
+	queue := &fakeQueue{jobs: []Job{{ID: "req-1", CanonicalID: "track-1", Query: "Artist Song"}}}
+	provider := &fakeProvider{}
+	searcher := &fakeSearcher{candidates: []Candidate{
+		{ID: "weak", Kind: "audio", Confidence: 0.1, Title: "Wrong Song"},
+	}}
+
+	runner := Runner{
+		Queue: queue, Provider: provider, Ingest: &fakeIngest{}, Searcher: searcher,
+		Between: time.Millisecond, Sleep: func(time.Duration) {},
+	}
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if len(provider.calls) != 0 {
+		t.Fatalf("provider calls = %d, want none", len(provider.calls))
+	}
+	if len(queue.failed) != 1 {
+		t.Fatalf("failed = %v, want req-1", queue.failed)
+	}
+	if len(queue.completed) != 0 {
+		t.Fatalf("completed = %v, want none", queue.completed)
+	}
+}

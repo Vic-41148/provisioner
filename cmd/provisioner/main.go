@@ -22,16 +22,18 @@ import (
 )
 
 type config struct {
-	Server    string
-	Token     string
-	TokenFile string
-	Once      bool
-	Interval  time.Duration
-	Between   time.Duration
-	Timeout   time.Duration
-	Binary    string
-	JSRuntime string
-	Cookies   string
+	Server         string
+	Token          string
+	TokenFile      string
+	Once           bool
+	Interval       time.Duration
+	Between        time.Duration
+	Timeout        time.Duration
+	Binary         string
+	JSRuntime      string
+	Cookies        string
+	MatchThreshold float64
+	SearchLimit    int
 }
 
 func main() {
@@ -46,6 +48,8 @@ func main() {
 	flag.StringVar(&cfg.Binary, "yt-dlp", "", "path to the yt-dlp executable; empty resolves via PATH")
 	flag.StringVar(&cfg.JSRuntime, "js-runtime", "", "JS runtime as name:path or a Deno path; empty lets yt-dlp choose")
 	flag.StringVar(&cfg.Cookies, "cookies", "", "optional cookie file")
+	flag.Float64Var(&cfg.MatchThreshold, "match-threshold", 0.5, "minimum confidence for a silent download")
+	flag.IntVar(&cfg.SearchLimit, "search-limit", 5, "candidates to inspect before downloading")
 	flag.Parse()
 
 	token, err := loadToken(cfg)
@@ -74,12 +78,16 @@ func main() {
 
 	client := acquisition.NewClient(cfg.Server, token)
 	runner := acquisition.Runner{
-		Queue:    client,
-		Provider: provider,
-		Ingest:   client,
-		Between:  cfg.Between,
-		Timeout:  cfg.Timeout,
-		Logf:     log.Printf,
+		Queue:          client,
+		Provider:       provider,
+		Ingest:         client,
+		Searcher:       provider,
+		Review:         client,
+		MatchThreshold: cfg.MatchThreshold,
+		SearchLimit:    cfg.SearchLimit,
+		Between:        cfg.Between,
+		Timeout:        cfg.Timeout,
+		Logf:           log.Printf,
 	}
 
 	if cfg.Once {

@@ -48,6 +48,17 @@ type Runner struct {
 	Queue    Queue
 	Provider Provider
 	Ingest   Ingest
+	// Searcher lists candidates before a download. A nil value sends the query
+	// straight to the provider, which is the old single-step behaviour.
+	Searcher Searcher
+	// Review records low-confidence matches. A nil value fails the request
+	// rather than downloading something uncertain.
+	Review Review
+	// MatchThreshold is the minimum confidence for a silent download. A zero
+	// value uses 0.5.
+	MatchThreshold float64
+	// SearchLimit bounds the candidate list. A zero value uses five.
+	SearchLimit int
 	// Between is the delay between two downloads. A zero value uses five
 	// seconds.
 	Between time.Duration
@@ -115,11 +126,26 @@ func (r Runner) process(ctx context.Context, job Job) error {
 		ctx, cancel = context.WithTimeout(ctx, r.Timeout)
 		defer cancel()
 	}
-	path, err := r.Provider.Acquire(ctx, Request{
+	request := Request{
 		ID:          job.ID,
 		CanonicalID: job.CanonicalID,
 		Query:       job.Query,
-	})
+	}
+	if r.Searcher != nil {
+		candidates, err := r.Searcher.Search(ctx, job.Query, r.searchLimit())
+		if err != nil {
+			return r.fail(ctx, job, err)
+		}
+		match, ok := PreferAudio(candidates)
+		if !ok {
+			return r.fail(ctx, job, fmt.Errorf("no candidate for %q", job.Query))
+		}
+		if LowConfidence(match.Best.Confidence, r.matchThreshold()) {
+			return r.review(ctx, job, match.Best)
+		}
+		request.Source = match.Best.URL
+	}
+	path, err := r.Provider.Acquire(ctx, request)
 	if err != nil {
 		return r.fail(ctx, job, err)
 	}
@@ -136,6 +162,31 @@ func (r Runner) process(ctx context.Context, job Job) error {
 		return err
 	}
 	return nil
+}
+
+func (r Runner) review(ctx context.Context, job Job, candidate Candidate) error {
+	if r.Review == nil {
+		return r.fail(ctx, job, fmt.Errorf("low-confidence match %q needs review", candidate.Title))
+	}
+	reason := fmt.Sprintf("low-confidence match %.2f: %s", candidate.Confidence, candidate.Title)
+	if err := r.Review.AddReview(ctx, job, candidate, reason); err != nil {
+		return r.fail(ctx, job, err)
+	}
+	return r.Queue.Complete(ctx, job.ID)
+}
+
+func (r Runner) matchThreshold() float64 {
+	if r.MatchThreshold <= 0 {
+		return 0.5
+	}
+	return r.MatchThreshold
+}
+
+func (r Runner) searchLimit() int {
+	if r.SearchLimit <= 0 {
+		return 5
+	}
+	return r.SearchLimit
 }
 
 func (r Runner) fail(ctx context.Context, job Job, cause error) error {

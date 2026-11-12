@@ -110,3 +110,62 @@ func TestYtDlpHealthRequiresFfmpeg(t *testing.T) {
 		t.Fatalf("Health().Reason = %q, want ffmpeg", health.Reason)
 	}
 }
+
+func TestParseSearchJSON(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte(`{
+		"entries": [
+			{"id": "a1", "title": "Artist - Song (Official Audio)", "uploader": "Artist - Topic", "duration": 210},
+			{"id": "v1", "title": "Artist - Song (Official Music Video)", "channel": "Artist", "duration": 215},
+			{"id": "u1", "title": "Artist - Song live at home", "uploader": "fan", "duration": 300},
+			{"title": "no id"}
+		]
+	}`)
+	candidates, err := parseSearchJSON(payload, "Artist Song")
+	if err != nil {
+		t.Fatalf("parseSearchJSON() error = %v", err)
+	}
+	if len(candidates) != 3 {
+		t.Fatalf("candidates = %d, want 3", len(candidates))
+	}
+	if candidates[0].Kind != "audio" || candidates[0].Artist != "Artist - Topic" {
+		t.Fatalf("audio candidate = %#v", candidates[0])
+	}
+	if candidates[1].Kind != "video" {
+		t.Fatalf("video candidate kind = %q, want video", candidates[1].Kind)
+	}
+	if candidates[2].Kind != "video" {
+		t.Fatalf("upload candidate kind = %q, want video", candidates[2].Kind)
+	}
+	for _, candidate := range candidates {
+		if candidate.URL == "" {
+			t.Fatalf("candidate %q has no URL", candidate.ID)
+		}
+		if candidate.Confidence < 0.9 {
+			t.Fatalf("candidate %q confidence = %v, want high", candidate.ID, candidate.Confidence)
+		}
+	}
+}
+
+func TestClassifyCandidate(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		title  string
+		artist string
+		want   string
+	}{
+		{"Song (Official Music Video)", "Artist", "video"},
+		{"Song (Official Audio)", "Artist", "audio"},
+		{"Song (Lyrics)", "Artist", "audio"},
+		{"Song", "Artist - Topic", "audio"},
+		{"Song", "Artist", "video"},
+		{"", "", "upload"},
+	}
+	for _, tc := range cases {
+		if got := classifyCandidate(tc.title, tc.artist); got != tc.want {
+			t.Errorf("classifyCandidate(%q, %q) = %q, want %q", tc.title, tc.artist, got, tc.want)
+		}
+	}
+}

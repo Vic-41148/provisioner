@@ -40,10 +40,24 @@ The admin token comes from `~/.syncd-token` by default, or from `-token-file`,
 `-interval`, `-between`, `-timeout`, `-yt-dlp` and `-cookies` to tune a
 long-running worker. Without `-once` the runner polls until interrupted.
 
-For each request the runner claims it, calls yt-dlp, uploads the file to
+For each request the runner claims it, searches for candidates, picks one, calls
+yt-dlp, uploads the file to
 `/sync/v1/library/uploads/{hash}?kind=cached`, and marks the request done. A
 download or upload error is recorded with `last_error` and the request goes back
 to the queue until its attempt budget is spent.
+
+## Matching
+
+Before downloading, the runner asks yt-dlp for up to `-search-limit` candidates
+(five by default). `PreferAudio` ranks audio tracks above music videos and
+uploads, then breaks ties on confidence. Confidence is the share of query tokens
+that appear in the candidate title and artist, so punctuation and case do not
+matter.
+
+A match below `-match-threshold` (0.5 by default) is never downloaded silently.
+The runner posts it to the core review queue and completes the request, leaving
+the decision to a human. If the review call fails, the request is failed with the
+error instead.
 
 ## Tests
 

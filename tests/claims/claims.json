@@ -41,17 +41,24 @@
       ]
     },
     {
+      "id": "matching-low-confidence-review",
+      "claim": "A low-confidence match goes to review instead of downloading silently.",
+      "evidence": [
+        "contains:tests/integration/integration_test.go::TestProvisionerSendsLowConfidenceToReview"
+      ]
+    },
+    {
+      "id": "matching-prefers-audio",
+      "claim": "Candidate matching prefers audio over video and uploads.",
+      "evidence": [
+        "contains:internal/acquisition/match_test.go::TestPreferAudioRanksKindsThenConfidence"
+      ]
+    },
+    {
       "id": "no-core-internal-import",
       "claim": "The provisioner never imports a core internal package.",
       "evidence": [
         "contains:tests/contract/contract_test.go::TestPluginNeverOpensCoreDatabase"
-      ]
-    },
-    {
-      "id": "no-dead-matching",
-      "claim": "The unused matching helper is gone.",
-      "evidence": [
-        "absent:internal/acquisition/match.go"
       ]
     },
     {
@@ -67,6 +74,13 @@
       "claim": "The runner drains the queue through a provider.",
       "evidence": [
         "contains:internal/acquisition/runner.go::Provider.Acquire"
+      ]
+    },
+    {
+      "id": "search-json-shape",
+      "claim": "yt-dlp search output is parsed into ranked candidates.",
+      "evidence": [
+        "contains:internal/acquisition/ytdlp_test.go::TestParseSearchJSON"
       ]
     }
   ]

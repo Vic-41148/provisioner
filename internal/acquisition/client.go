@@ -103,6 +103,29 @@ func (c *Client) Fail(ctx context.Context, id, message string) error {
 	return nil
 }
 
+// AddReview records a match that needs a human decision. It uses the core
+// review queue, not a private table.
+func (c *Client) AddReview(ctx context.Context, job Job, candidate Candidate, reason string) error {
+	body, err := json.Marshal(map[string]string{
+		"canonical_id": job.CanonicalID,
+		"provider":     "yt-dlp",
+		"service_id":   candidate.ID,
+		"reason":       reason,
+	})
+	if err != nil {
+		return fmt.Errorf("review: encode: %w", err)
+	}
+	resp, err := c.do(ctx, http.MethodPost, "/sync/v1/review", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return responseError("review", resp)
+	}
+	return nil
+}
+
 // Ingest uploads a downloaded file as a cached rendition for the requested
 // canonical track. The core verifies the digest before indexing it.
 func (c *Client) Ingest(ctx context.Context, job Job, path, hash, name string) error {
