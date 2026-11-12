@@ -26,6 +26,13 @@
       ]
     },
     {
+      "id": "integration-suite",
+      "claim": "The runner drains a queue through the real client against a fake core.",
+      "evidence": [
+        "contains:tests/integration/integration_test.go::TestProvisionerDrainsQueueWithFakeYtDlp"
+      ]
+    },
+    {
       "id": "kill-switch-stops-runner",
       "claim": "The runner stops when a claim is refused by the core kill switch.",
       "evidence": [

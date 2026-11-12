@@ -44,3 +44,14 @@ For each request the runner claims it, calls yt-dlp, uploads the file to
 `/sync/v1/library/uploads/{hash}?kind=cached`, and marks the request done. A
 download or upload error is recorded with `last_error` and the request goes back
 to the queue until its attempt budget is spent.
+
+## Tests
+
+```sh
+go test ./...
+go test -tags=integration ./tests/integration
+```
+
+The integration suite runs the real client and runner against a fake core over
+`httptest`; it needs no YouTube, network, `yt-dlp` or `ffmpeg`.
+
