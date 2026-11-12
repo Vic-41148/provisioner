@@ -16,7 +16,7 @@ content.
 
 - `yt-dlp` on the nightly channel, installed separately and available on PATH
   or configured by path.
-- Deno (default JS runtime) for full support.
+- Deno, yt-dlp's default JS runtime, for full support.
 - `ffmpeg` on PATH, required by yt-dlp's audio extraction.
 - Cookies are off by default. If used, a throwaway Google account cookie file
   is stored locally and is never logged or committed.
