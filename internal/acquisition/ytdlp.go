@@ -21,8 +21,6 @@ type YtDlp struct {
 	Runtime string
 	// Cookies is an optional cookie file. Empty means no cookies.
 	Cookies string
-	// POProvider is an optional PO-token provider executable.
-	POProvider string
 }
 
 func (y *YtDlp) Name() string { return "yt-dlp" }
@@ -77,10 +75,8 @@ func (y *YtDlp) Health(ctx context.Context) (Health, error) {
 			return Health{Available: false, Reason: "cookie file unavailable: " + err.Error()}, nil
 		}
 	}
-	if strings.TrimSpace(y.POProvider) != "" {
-		if _, err := os.Stat(y.POProvider); err != nil {
-			return Health{Available: false, Reason: "po-token provider unavailable: " + err.Error()}, nil
-		}
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		return Health{Available: false, Reason: "ffmpeg not on PATH: " + err.Error()}, nil
 	}
 	// Confirm the binary actually runs.
 	if out, err := exec.CommandContext(ctx, bin, "--version").Output(); err != nil {

@@ -22,17 +22,16 @@ import (
 )
 
 type config struct {
-	Server     string
-	Token      string
-	TokenFile  string
-	Once       bool
-	Interval   time.Duration
-	Between    time.Duration
-	Timeout    time.Duration
-	Binary     string
-	JSRuntime  string
-	Cookies    string
-	POProvider string
+	Server    string
+	Token     string
+	TokenFile string
+	Once      bool
+	Interval  time.Duration
+	Between   time.Duration
+	Timeout   time.Duration
+	Binary    string
+	JSRuntime string
+	Cookies   string
 }
 
 func main() {
@@ -47,7 +46,6 @@ func main() {
 	flag.StringVar(&cfg.Binary, "yt-dlp", "", "path to the yt-dlp executable; empty resolves via PATH")
 	flag.StringVar(&cfg.JSRuntime, "js-runtime", "", "JS runtime as name:path or a Deno path; empty lets yt-dlp choose")
 	flag.StringVar(&cfg.Cookies, "cookies", "", "optional cookie file")
-	flag.StringVar(&cfg.POProvider, "po-provider", "", "optional PO-token provider executable")
 	flag.Parse()
 
 	token, err := loadToken(cfg)
@@ -59,10 +57,9 @@ func main() {
 	}
 
 	provider := &acquisition.YtDlp{
-		Binary:     cfg.Binary,
-		Runtime:    cfg.JSRuntime,
-		Cookies:    cfg.Cookies,
-		POProvider: cfg.POProvider,
+		Binary:  cfg.Binary,
+		Runtime: cfg.JSRuntime,
+		Cookies: cfg.Cookies,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

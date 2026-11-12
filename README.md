@@ -17,14 +17,14 @@ content.
 - `yt-dlp` on the nightly channel, installed separately and available on PATH
   or configured by path.
 - Deno (default JS runtime) for full support.
-- An optional PO-token provider for full support.
+- `ffmpeg` on PATH, required by yt-dlp's audio extraction.
 - Cookies are off by default. If used, a throwaway Google account cookie file
   is stored locally and is never logged or committed.
 
 ## Health
 
-Startup checks verify the runtime, token provider and cookie file. On failure
-the plugin reports "YouTube downloads unavailable" and GrooveSync core is
+Startup checks verify the runtime, `ffmpeg` and cookie file. On failure the
+plugin reports "YouTube downloads unavailable" and GrooveSync core is
 unaffected.
 
 ## Running
@@ -37,8 +37,8 @@ uploads each download as a cached rendition. It never opens syncd's database.
 The admin token comes from `~/.syncd-token` by default, or from `-token-file`,
 `SYNCD_TOKEN`, or `-token`. A platform-supplied JS runtime can be selected with
 `-js-runtime node:/path/to/node`; a bare path keeps the Deno default. Use
-`-interval`, `-between`, `-timeout`, `-yt-dlp`, `-cookies` and `-po-provider` to
-tune a long-running worker. Without `-once` the runner polls until interrupted.
+`-interval`, `-between`, `-timeout`, `-yt-dlp` and `-cookies` to tune a
+long-running worker. Without `-once` the runner polls until interrupted.
 
 For each request the runner claims it, calls yt-dlp, uploads the file to
 `/sync/v1/library/uploads/{hash}?kind=cached`, and marks the request done. A
