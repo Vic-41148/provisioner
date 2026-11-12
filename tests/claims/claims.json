@@ -2,6 +2,13 @@
   "version": 1,
   "claims": [
     {
+      "id": "contract-job-shape",
+      "claim": "The provisioner Job JSON shape is pinned by a test.",
+      "evidence": [
+        "contains:tests/contract/contract_test.go::TestJobJSONShape"
+      ]
+    },
+    {
       "id": "external-ytdlp",
       "claim": "Downloads shell out to the external yt-dlp executable.",
       "evidence": [
@@ -24,6 +31,13 @@
       "evidence": [
         "contains:internal/acquisition/runner.go::ErrStopped",
         "contains:internal/acquisition/client.go::ErrStopped"
+      ]
+    },
+    {
+      "id": "no-core-internal-import",
+      "claim": "The provisioner never imports a core internal package.",
+      "evidence": [
+        "contains:tests/contract/contract_test.go::TestPluginNeverOpensCoreDatabase"
       ]
     },
     {
