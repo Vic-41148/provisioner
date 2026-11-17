@@ -4,3 +4,7 @@
 cookies.txt
 *.cookies
 temp/
+
+# Python bytecode
+__pycache__/
+*.pyc

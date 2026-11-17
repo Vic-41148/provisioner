@@ -54,6 +54,25 @@ yt-dlp, uploads the file to
 download or upload error is recorded with `last_error` and the request goes back
 to the queue until its attempt budget is spent.
 
+## Browse sidecar
+
+The optional `sidecar/ytmusic_sidecar.py` is a read-only JSON service on
+loopback that lets the GrooveSync client browse the signed-in YouTube Music
+account. It owns the account and never downloads audio; acquisition requests
+still go through this runner. It needs Python 3.10, `ytmusicapi`, and an auth
+file created once with `ytmusicapi browser`.
+
+    python3 sidecar/ytmusic_sidecar.py --auth ~/.config/groovesync/ytmusic-auth.json
+
+It listens on `127.0.0.1:8099` by default and exposes `/health`, `/search`,
+`/likes`, `/library/songs`, `/library/albums`, `/library/artists`, `/home`,
+`/playlists` and `/playlists/{id}/tracks`, plus `POST /ratings`. Point syncd at
+it with `SYNCD_YTMUSIC_URL=http://127.0.0.1:8099`; without that setting no
+browse feature is advertised. Tests use a stub ytmusicapi and do not touch the
+network:
+
+    python3 -m unittest discover -s tests/sidecar
+
 ## Matching
 
 Before downloading, the runner asks yt-dlp for up to `-search-limit` candidates

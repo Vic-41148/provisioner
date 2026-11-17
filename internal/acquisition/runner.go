@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -20,6 +21,7 @@ type Job struct {
 	ID          string `json:"id"`
 	CanonicalID string `json:"canonical_id"`
 	Query       string `json:"query"`
+	Source      string `json:"source,omitempty"`
 	State       string `json:"state,omitempty"`
 	Attempts    int    `json:"attempts,omitempty"`
 	LastError   string `json:"last_error,omitempty"`
@@ -130,8 +132,11 @@ func (r Runner) process(ctx context.Context, job Job) error {
 		ID:          job.ID,
 		CanonicalID: job.CanonicalID,
 		Query:       job.Query,
+		Source:      job.Source,
 	}
-	if r.Searcher != nil {
+	// A source handed down by the core names the exact item the user picked,
+	// so the search step would only replace it with a guess.
+	if strings.TrimSpace(job.Source) == "" && r.Searcher != nil {
 		candidates, err := r.Searcher.Search(ctx, job.Query, r.searchLimit())
 		if err != nil {
 			return r.fail(ctx, job, err)

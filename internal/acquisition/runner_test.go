@@ -319,3 +319,32 @@ func TestRunnerFailsLowConfidenceWithoutReview(t *testing.T) {
 		t.Fatalf("completed = %v, want none", queue.completed)
 	}
 }
+
+func TestRunnerUsesAnExactSourceWithoutSearching(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "song.opus")
+	if err := os.WriteFile(path, []byte("downloaded audio"), 0o644); err != nil {
+		t.Fatalf("write download: %v", err)
+	}
+	queue := &fakeQueue{jobs: []Job{{
+		ID: "req-1", CanonicalID: "track-1", Query: "Artist Song",
+		Source: "https://music.youtube.com/watch?v=v1",
+	}}}
+	provider := &fakeProvider{path: path}
+	searcher := &fakeSearcher{}
+
+	runner := Runner{
+		Queue: queue, Provider: provider, Ingest: &fakeIngest{}, Searcher: searcher,
+		Between: time.Millisecond, Sleep: func(time.Duration) {},
+	}
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if len(searcher.queries) != 0 {
+		t.Fatalf("search queries = %v, want none with an exact source", searcher.queries)
+	}
+	if len(provider.calls) != 1 || provider.calls[0].Source != "https://music.youtube.com/watch?v=v1" {
+		t.Fatalf("provider calls = %#v", provider.calls)
+	}
+}
