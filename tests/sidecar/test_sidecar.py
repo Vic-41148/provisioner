@@ -95,6 +95,28 @@ class SidecarTest(unittest.TestCase):
     def test_health(self):
         self.assertEqual({"ok": True}, self.get("/health"))
 
+    def test_check_reads_the_account(self):
+        ok, detail = self.sidecar.check(self.sidecar.Account(str(self.auth)))
+        self.assertTrue(ok)
+        self.assertEqual("Sample User", detail)
+
+    def test_check_reports_missing_auth(self):
+        ok, detail = self.sidecar.check(self.sidecar.Account(""))
+        self.assertFalse(ok)
+        self.assertEqual("GROOVESYNC_YTMUSIC_AUTH is not set", detail)
+
+    def test_check_reports_a_failed_read(self):
+        account = self.sidecar.Account(str(self.auth))
+
+        class Expired:
+            def get_account_info(self):
+                raise RuntimeError("cookies expired")
+
+        account.client = Expired()
+        ok, detail = self.sidecar.check(account)
+        self.assertFalse(ok)
+        self.assertIn("cookies expired", detail)
+
     def test_search_maps_tracks(self):
         payload = self.get("/search?q=night&limit=3")
         track = payload["tracks"][0]

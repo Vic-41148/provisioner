@@ -67,6 +67,9 @@ page comes back.
 
     python3 sidecar/ytmusic_sidecar.py --auth ~/.config/groovesync/ytmusic-auth.json
 
+Run it once with `--check` first: that reads the account and prints its name, so
+expired cookies fail before syncd is pointed at the sidecar.
+
 It listens on `127.0.0.1:8099` by default and exposes `/health`, `/account`,
 `/search`, `/likes`, `/library/songs`, `/library/albums`, `/library/artists`,
 `/home`, `/playlists`, `/playlists/{id}/tracks`, `/albums/{id}/tracks` and

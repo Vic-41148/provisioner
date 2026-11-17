@@ -11,8 +11,10 @@ acquisition request. Only ytmusicapi is required; the HTTP server is stdlib.
 
 Create the auth file once with `ytmusicapi browser`. The calls use the current
 ytmusicapi surface (`search`, `get_library_*`, `get_album`, `get_artist`), with
-`limit=None` on the library reads so every page is returned. The sidecar refuses to
-start without it, reports why over /health, and keeps everything on loopback.
+`limit=None` on the library reads so every page is returned. Without a usable
+auth file the sidecar starts unauthenticated and reports why over /health;
+`--check` reads the account once so expired cookies fail before syncd is
+pointed at it. Everything stays on loopback.
 """
 
 from __future__ import annotations
@@ -295,6 +297,17 @@ def create_server(account: Account, host: str, port: int) -> ThreadingHTTPServer
     return ThreadingHTTPServer((host, port), handler)
 
 
+def check(account: Account) -> tuple[bool, str]:
+    """Reads the account once, so --check also proves the cookies work."""
+    if not account.ready():
+        return False, account.error
+    try:
+        info = account.client.get_account_info() or {}
+    except Exception as error:  # noqa: BLE001 - reported to the caller
+        return False, f"account read failed: {error}"
+    return True, str(info.get("accountName") or "").strip()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="GrooveSync YouTube Music browse sidecar")
     parser.add_argument("--auth", default=os.environ.get("GROOVESYNC_YTMUSIC_AUTH", ""),
@@ -306,10 +319,11 @@ def main() -> int:
 
     account = Account(args.auth)
     if args.check:
-        if not account.ready():
-            print(account.error, file=sys.stderr)
+        ok, detail = check(account)
+        if not ok:
+            print(detail, file=sys.stderr)
             return 2
-        print("ok")
+        print("ok" + (f": {detail}" if detail else ""))
         return 0
 
     server = create_server(account, args.host, args.port)
