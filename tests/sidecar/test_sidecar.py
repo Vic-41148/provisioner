@@ -24,6 +24,9 @@ class FakeYTMusic:
         return [{"videoId": "v1", "title": f"Found {query}", "artists": [{"name": "Artist"}],
                  "album": {"name": "Album"}, "duration_seconds": 185, "resultType": "song"}]
 
+    def get_account_info(self):
+        return {"accountName": "Sample User", "channelHandle": "@sample", "accountPhotoUrl": "https://x"}
+
     def get_liked_songs(self, limit=None):
         return {"tracks": [{"videoId": "v2", "title": "Liked", "artists": [{"name": "Artist"}],
                             "duration_seconds": 200}]}
@@ -100,6 +103,11 @@ class SidecarTest(unittest.TestCase):
         self.assertEqual(["Artist"], track["artists"])
         self.assertEqual("Album", track["album"])
         self.assertEqual(185000, track["duration_ms"])
+
+    def test_account_route(self):
+        account = self.get("/account")["account"]
+        self.assertEqual("Sample User", account["name"])
+        self.assertEqual("@sample", account["handle"])
 
     def test_library_routes(self):
         self.assertEqual("v2", self.get("/likes")["tracks"][0]["video_id"])

@@ -67,9 +67,9 @@ page comes back.
 
     python3 sidecar/ytmusic_sidecar.py --auth ~/.config/groovesync/ytmusic-auth.json
 
-It listens on `127.0.0.1:8099` by default and exposes `/health`, `/search`,
-`/likes`, `/library/songs`, `/library/albums`, `/library/artists`, `/home`,
-`/playlists`, `/playlists/{id}/tracks`, `/albums/{id}/tracks` and
+It listens on `127.0.0.1:8099` by default and exposes `/health`, `/account`,
+`/search`, `/likes`, `/library/songs`, `/library/albums`, `/library/artists`,
+`/home`, `/playlists`, `/playlists/{id}/tracks`, `/albums/{id}/tracks` and
 `/artists/{id}/tracks`, plus `POST /ratings`. Point syncd at
 it with `SYNCD_YTMUSIC_URL=http://127.0.0.1:8099`; without that setting no
 browse feature is advertised. Tests use a stub ytmusicapi and do not touch the

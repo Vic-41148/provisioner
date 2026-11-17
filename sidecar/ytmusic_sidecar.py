@@ -218,6 +218,13 @@ class Handler(BaseHTTPRequestHandler):
             rows = client.search(text, filter="songs", limit=max(1, min(limit, 50)))
             self.send_json(200, {"tracks": tracks(rows)})
             return
+        if path == "/account":
+            info = client.get_account_info() or {}
+            self.send_json(200, {"account": {
+                "name": str(info.get("accountName") or ""),
+                "handle": str(info.get("channelHandle") or ""),
+            }})
+            return
         if path == "/likes":
             self.send_json(200, {"tracks": tracks(client.get_liked_songs(limit=None).get("tracks"))})
             return
