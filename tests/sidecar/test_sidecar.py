@@ -19,7 +19,7 @@ class FakeYTMusic:
     def __init__(self, auth):
         self.auth = auth
 
-    def get_search_results(self, query, filter=None, limit=20):
+    def search(self, query, filter=None, limit=20):
         assert filter == "songs"
         return [{"videoId": "v1", "title": f"Found {query}", "artists": [{"name": "Artist"}],
                  "album": {"name": "Album"}, "duration_seconds": 185, "resultType": "song"}]
@@ -31,16 +31,19 @@ class FakeYTMusic:
     def get_library_songs(self, limit=None):
         return [{"videoId": "v3", "title": "Saved", "artists": ["Artist"], "duration": "3:05"}]
 
-    def get_library_albums(self):
+    def get_library_albums(self, limit=25):
+        assert limit is None
         return [{"browseId": "a1", "title": "Album", "artists": [{"name": "Artist"}], "year": "2020"}]
 
-    def get_library_artists(self):
+    def get_library_artists(self, limit=25):
+        assert limit is None
         return [{"browseId": "ar1", "artist": "Artist"}]
 
     def get_home(self, limit=8):
         return [{"title": "Listen again", "contents": [{"videoId": "v4", "title": "Again"}, {"title": "Shelf"}]}]
 
-    def get_library_playlists(self):
+    def get_library_playlists(self, limit=25):
+        assert limit is None
         return [{"playlistId": "p1", "title": "Mix", "count": 2}]
 
     def get_playlist(self, playlist_id, limit=None):

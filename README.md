@@ -59,8 +59,11 @@ to the queue until its attempt budget is spent.
 The optional `sidecar/ytmusic_sidecar.py` is a read-only JSON service on
 loopback that lets the GrooveSync client browse the signed-in YouTube Music
 account. It owns the account and never downloads audio; acquisition requests
-still go through this runner. It needs Python 3.10, `ytmusicapi`, and an auth
-file created once with `ytmusicapi browser`.
+still go through this runner. It needs Python 3.10, `ytmusicapi` 1.12 or
+newer, and an auth file created once with `ytmusicapi browser`. The calls use
+the current ytmusicapi surface (`search`, `get_library_*`, `get_album`,
+`get_artist`, `rate_song`), and the library reads pass `limit=None` so every
+page comes back.
 
     python3 sidecar/ytmusic_sidecar.py --auth ~/.config/groovesync/ytmusic-auth.json
 

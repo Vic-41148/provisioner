@@ -9,7 +9,9 @@ acquisition request. Only ytmusicapi is required; the HTTP server is stdlib.
 
     python3 ytmusic_sidecar.py --auth ~/.config/groovesync/ytmusic-auth.json
 
-Create the auth file once with `ytmusicapi browser`. The sidecar refuses to
+Create the auth file once with `ytmusicapi browser`. The calls use the current
+ytmusicapi surface (`search`, `get_library_*`, `get_album`, `get_artist`), with
+`limit=None` on the library reads so every page is returned. The sidecar refuses to
 start without it, reports why over /health, and keeps everything on loopback.
 """
 
@@ -213,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 self.send_json(400, {"error": "limit must be a number"})
                 return
-            rows = client.get_search_results(text, filter="songs", limit=max(1, min(limit, 50)))
+            rows = client.search(text, filter="songs", limit=max(1, min(limit, 50)))
             self.send_json(200, {"tracks": tracks(rows)})
             return
         if path == "/likes":
@@ -223,16 +225,16 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"tracks": tracks(client.get_library_songs(limit=None))})
             return
         if path == "/library/albums":
-            self.send_json(200, {"albums": [album(row) for row in client.get_library_albums() or []]})
+            self.send_json(200, {"albums": [album(row) for row in client.get_library_albums(limit=None) or []]})
             return
         if path == "/library/artists":
-            self.send_json(200, {"artists": [artist(row) for row in client.get_library_artists() or []]})
+            self.send_json(200, {"artists": [artist(row) for row in client.get_library_artists(limit=None) or []]})
             return
         if path == "/home":
             self.send_json(200, {"sections": home_sections(client.get_home(limit=8))})
             return
         if path == "/playlists":
-            self.send_json(200, {"playlists": [playlist(row) for row in client.get_library_playlists() or []]})
+            self.send_json(200, {"playlists": [playlist(row) for row in client.get_library_playlists(limit=None) or []]})
             return
         match = re.fullmatch(r"/playlists/([^/]+)/tracks", path)
         if match:
