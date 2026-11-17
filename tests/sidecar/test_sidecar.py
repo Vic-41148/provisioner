@@ -46,6 +46,14 @@ class FakeYTMusic:
     def get_playlist(self, playlist_id, limit=None):
         return {"tracks": [{"videoId": "v5", "title": f"From {playlist_id}"}]}
 
+    def get_album(self, browse_id):
+        return {"tracks": [{"videoId": "v6", "title": f"Album {browse_id}", "duration_seconds": 90}]}
+
+    def get_artist(self, browse_id):
+        return {"songs": {"browseId": "MPAD", "results": [
+            {"videoId": "v7", "title": f"Artist {browse_id}", "artists": [{"name": "Someone"}]},
+        ]}}
+
     def rate_song(self, video_id, rating):
         self.rated = (video_id, rating)
 
@@ -101,6 +109,12 @@ class SidecarTest(unittest.TestCase):
         self.assertEqual("v4", home[0]["tracks"][0]["video_id"])
         self.assertEqual("p1", self.get("/playlists")["playlists"][0]["id"])
         self.assertEqual("v5", self.get("/playlists/p1/tracks")["tracks"][0]["video_id"])
+        album = self.get("/albums/a1/tracks")["tracks"][0]
+        self.assertEqual("v6", album["video_id"])
+        self.assertEqual(90000, album["duration_ms"])
+        artist = self.get("/artists/ar1/tracks")["tracks"][0]
+        self.assertEqual("v7", artist["video_id"])
+        self.assertEqual(["Someone"], artist["artists"])
 
     def test_rating(self):
         request = urllib.request.Request(

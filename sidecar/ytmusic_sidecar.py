@@ -240,6 +240,18 @@ class Handler(BaseHTTPRequestHandler):
             payload = client.get_playlist(playlist_id, limit=None) or {}
             self.send_json(200, {"tracks": tracks(payload.get("tracks"))})
             return
+        match = re.fullmatch(r"/albums/([^/]+)/tracks", path)
+        if match:
+            payload = client.get_album(match.group(1)) or {}
+            self.send_json(200, {"tracks": tracks(payload.get("tracks"))})
+            return
+        match = re.fullmatch(r"/artists/([^/]+)/tracks", path)
+        if match:
+            payload = client.get_artist(match.group(1)) or {}
+            songs = payload.get("songs") or {}
+            rows = songs.get("results") if isinstance(songs, dict) else songs
+            self.send_json(200, {"tracks": tracks(rows)})
+            return
         self.send_json(404, {"error": "unknown endpoint"})
 
     def do_POST(self) -> None:  # noqa: N802 - http.server API
